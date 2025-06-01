@@ -1,0 +1,56 @@
+﻿<UserControl x:Class="EpubReaderA.EpubControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:EpubReaderA"
+             xmlns:web="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             mc:Ignorable="d"
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+
+        <Grid x:Name="Expander" Grid.Row="0" Grid.Column="0" Grid.RowSpan="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TreeView x:Name="Menu">
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate DataType="{x:Type local:MenuItemModel}"
+                                              ItemsSource="{Binding Nested}">
+                        <Button Command="{Binding NavigateCommand}" Content="{Binding Title}" />
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+
+            <Button Grid.Row="1" x:Name="Structure" Content="BUTTON" />
+        </Grid>
+
+
+        <Grid Grid.Row="0" Grid.Column="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" x:Name="Expand" Content="|||" />
+            <Button Grid.Column="1" x:Name="Prev" Content="Prev" />
+            <Slider Grid.Column="2" x:Name="Slider" IsSnapToTickEnabled="True" TickFrequency="1" />
+            <Button Grid.Column="3" x:Name="Next" Content="Next" />
+        </Grid>
+
+        <web:WebView2 x:Name="WebView" Grid.Column="1" Grid.Row="1" />
+    </Grid>
+</UserControl>
