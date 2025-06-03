@@ -1,10 +1,11 @@
-﻿using System.IO;
+﻿using Microsoft.Web.WebView2.Core;
+using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
+using System.Windows.Input;
 using System.Xml.Linq;
-using Microsoft.Web.WebView2.Core;
 using VersOne.Epub;
 
 namespace EpubReaderA;
@@ -12,9 +13,7 @@ namespace EpubReaderA;
 public partial class EpubControl
 {
     public EpubControl()
-    {
-        InitializeComponent();
-    }
+        => InitializeComponent();
 
     public EpubControl(string path)
     {
@@ -73,14 +72,97 @@ public partial class EpubControl
                   })();
                   """);
 
-        Navigate(Book.Navigation?.FirstOrDefault()?.Link?.ContentFileUrl ?? Book.ReadingOrder.FirstOrDefault()?.Key);
+        var unifiedHtml = $$"""
+            <!DOCTYPE html>
+                <html>
+                    <head>
+                        <script defer>
+                            function resizer(id) {
+                              const iframe = document.getElementById(id);
+                              if (!iframe) return;
+
+                              function updateSize() {
+                                const html = iframe.contentWindow.document.documentElement;
+                                const height = html.getBoundingClientRect().height + 35;
+                                iframe.style.height = height + 'px';
+                              }
+
+                              updateSize();
+                              new ResizeObserver(updateSize).observe(iframe.contentDocument.body);
+                            }
+
+                            function scrollToAnchor(iframeId, anchorId) {
+                              const iframe = document.getElementById(iframeId);
+                              const doc = iframe.contentWindow.document;
+                              const target = doc.getElementById(anchorId) || doc.querySelector(`[name='${anchorId}']`);
+                              if (target) {
+                                target.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }
+
+                            function injectScrollScript(iframe) {
+                              try {
+                                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                const script = doc.createElement('script');
+                                script.textContent = `
+                                  (function () {
+                                    document.querySelectorAll('a[href]').forEach((link) => {
+                                      link.addEventListener('click', function (e) {
+                                        const target = this.getAttribute('href');
+                                        if (target.startsWith('http')) return;
+
+                                        const targetPath = this.href.replace('{{Constants.VirtualHostFull}}','');
+                                        e.preventDefault();
+                                        if (targetPath.includes('#')) {
+                                          let [key, a] = targetPath.split('#');
+                                          if (window.parent && window.parent.scrollToAnchor) {
+                                            window.parent.scrollToAnchor(key, a);
+                                          }
+                                        } else {
+                                          window.parent.document.getElementById(targetPath).scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                      });
+                                    });
+                                  })();
+                                `;
+                                doc.head.appendChild(script);
+                              } catch (e) {
+                                console.warn('Failed to inject script into iframe (likely cross-origin):', e);
+                              }
+                            }
+
+                            window.addEventListener('load', () => {
+                              const iframes = document.querySelectorAll('iframe');
+                              iframes.forEach((iframe) => {
+                                iframe.addEventListener('load', () => injectScrollScript(iframe));
+                                // Inject again in case it's already loaded
+                                injectScrollScript(iframe);
+                              });
+                            });
+                        </script>
+                        <style>
+                            body { margin: 0; }
+                            iframe {
+                                display: block;
+                                border: none;
+                                width: 100%;
+                            }                        
+                        </style>
+                    </head>
+                <body>
+                    {{Book.ReadingOrder.Aggregate("", (a, b) => a + $"<iframe src=\"{Constants.VirtualHostFull}{b.Key}\" id=\"{b.Key}\" onLoad=\"resizer('{b.Key}');\"></iframe>")}}
+                </body>
+            </html>
+            """;
+
+        File.WriteAllText($"{Constants.TempPath}EpubReaderUnifiedHtml.html", unifiedHtml);
+
+        WebView.CoreWebView2.Navigate($"{Constants.VirtualHostFull}{"EpubReaderUnifiedHtml.html"}");
 
 
         var menuItems = Book.Navigation?.Select(ro => new MenuItemModel(ro));
         var coverItem = Book.Content.Cover != null ? new MenuItemModel("Cover", Book.Content.Cover.Key) : null;
-        var navItem = Book.Content.NavigationHtmlFile != null
-            ? new MenuItemModel("Navigation", Book.Content.NavigationHtmlFile.Key)
-            : null;
+        var navItem = Book.Content.NavigationHtmlFile != null ? new MenuItemModel("Navigation", Book.Content.NavigationHtmlFile.Key) : null;
 
         Menu.ItemsSource = (menuItems ?? []).Concat(new[] { coverItem, navItem }.Where(x => x != null));
 
@@ -91,20 +173,20 @@ public partial class EpubControl
         {
             var target = Book.ReadingOrder[(int)args.NewValue - 1].Key;
             if (CurrentPage != target)
-                Navigate(target);
+                _ = NavigateAsync(target);
         };
 
         Prev.Click += (_, _) =>
         {
             var targetIndex = Math.Clamp(CurrentIndex - 1, 0, Book.ReadingOrder.Count - 1);
             var target = Book.ReadingOrder[targetIndex].Key;
-            Navigate(target);
+            _ = NavigateAsync(target);
         };
         Next.Click += (_, _) =>
         {
             var targetIndex = Math.Clamp(CurrentIndex + 1, 0, Book.ReadingOrder.Count - 1);
             var target = Book.ReadingOrder[targetIndex].Key;
-            Navigate(target);
+            _ = NavigateAsync(target);
         };
 
         Expand.Click += (_, _) =>
@@ -125,21 +207,56 @@ public partial class EpubControl
     public string CurrentPage => WebView.CoreWebView2.Source.Replace(Constants.VirtualHostFull, "");
     public int CurrentIndex => Book?.ReadingOrder.FindIndex(a => a.Key == CurrentPage) ?? -1;
 
-    public void Navigate(string? key, string? a = null)
+    public async Task NavigateAsync(string? key, string? a = null)
     {
+        if (Book == null) return;
+
         if (string.IsNullOrWhiteSpace(key)) return;
 
         Console.WriteLine($"To Path: {key} | {(a != null ? "#" : "")}{a}");
         Console.WriteLine(File.Exists($"{Constants.TempPath}{key}"));
         if (!File.Exists($"{Constants.TempPath}{key}"))
-        {
             key = key.Split('.').Last() + "/" + key;
+
+        if (!Book.ReadingOrder.Any(a => a.Key == key))
+        {
+            WebView.CoreWebView2.Navigate($"{Constants.VirtualHostFull}{key}{(string.IsNullOrWhiteSpace(a) ? "" : "#")}{a}");
+            return;
         }
 
-        WebView.CoreWebView2.Navigate($"{Constants.VirtualHostFull}{key}{(a != null ? "#" : "")}{a}");
+        if (WebView.CoreWebView2.Source != $"{Constants.VirtualHostFull}EpubReaderUnifiedHtml.html")
+        {
+            WebView.CoreWebView2.Navigate($"{Constants.VirtualHostFull}EpubReaderUnifiedHtml.html");
+            await WaitForPageLoadAsync();
+        }
+
+        if (!string.IsNullOrWhiteSpace(a))
+            await WebView.ExecuteScriptAsync($"scrollToAnchor('{key}','{a}');");
+        else
+            await WebView.ExecuteScriptAsync($"document.getElementById('{key}').scrollIntoView({{ behavior: 'smooth' }});");
     }
 
-    private void WriteTemp(EpubLocalTextContentFile? file)
+    public async Task WaitForPageLoadAsync()
+    {
+        var tcs = new TaskCompletionSource<bool>();
+
+        void Handler(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            WebView.CoreWebView2.NavigationCompleted -= Handler;
+
+            if (e.IsSuccess)
+                tcs.SetResult(true);
+            else
+                tcs.SetException(new Exception($"Navigation failed: {e.WebErrorStatus}"));
+        }
+
+        WebView.CoreWebView2.NavigationCompleted += Handler;
+
+        await tcs.Task;
+    }
+
+
+    private static void WriteTemp(EpubLocalTextContentFile? file)
     {
         if (file is null) return;
         var path = $"{Constants.TempPath}{file.Key}";
@@ -148,7 +265,7 @@ public partial class EpubControl
         File.WriteAllText(path, file.Content);
     }
 
-    private void WriteTemp(EpubLocalByteContentFile? file)
+    private static void WriteTemp(EpubLocalByteContentFile? file)
     {
         if (file is null) return;
         var path = $"{Constants.TempPath}{file.Key}";
@@ -212,10 +329,10 @@ public partial class EpubControl
                     {
                         for (var i = 0; i < keyLen && processed < maxBytes && input.Position < input.Length; i++)
                         {
-                            int b = input.ReadByte();
+                            var b = input.ReadByte();
                             if (b == -1) break;
 
-                            byte deobfuscated = (byte)(b ^ key[i]);
+                            var deobfuscated = (byte)(b ^ key[i]);
                             output.WriteByte(deobfuscated);
                             processed++;
                         }

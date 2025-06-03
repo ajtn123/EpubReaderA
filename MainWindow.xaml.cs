@@ -11,7 +11,7 @@ public partial class MainWindow
     {
         InitializeComponent();
 
-        ShowEpub(@"C:\Users\chenf\OneDrive\轻小说\[雨森たきび] 败犬女主太多了!\[雨森たきび] 败犬女主太多了! [01].epub");
+        ShowEpub("C:/Users/chenf/Downloads/epub30-spec.epub");
 
         CurrentEpubView ??= new EpubControl();
 

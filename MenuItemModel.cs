@@ -11,7 +11,7 @@ public class MenuItemModel
         NavigationItem = navigationItem;
         Nested = navigationItem.NestedItems.Select(ro => new MenuItemModel(ro));
         NavigateCommand = new NavigateCommand
-            { Key = navigationItem.Link?.ContentFileUrl, Anchor = NavigationItem.Link?.Anchor };
+        { Key = navigationItem.Link?.ContentFileUrl, Anchor = NavigationItem.Link?.Anchor };
         Title = navigationItem.Title;
     }
 
@@ -34,7 +34,7 @@ public class NavigateCommand : ICommand
 
     public void Execute(object? parameter) =>
         // ReSharper disable once AccessToStaticMemberViaDerivedType
-        (Window.GetWindow(App.Current.MainWindow!) as MainWindow)?.CurrentEpubView.Navigate(Key, Anchor);
+        (Window.GetWindow(App.Current.MainWindow!) as MainWindow)?.CurrentEpubView.NavigateAsync(Key, Anchor);
 
     public bool CanExecute(object? parameter) => Key != null;
 
