@@ -76,13 +76,12 @@ public partial class EpubControl
             <!DOCTYPE html>
                 <html>
                     <head>
-                        <script defer>
-                            function resizer(id) {
-                              const iframe = document.getElementById(id);
+                        <script>
+                            function resizeIframe(iframe) {
                               if (!iframe) return;
 
                               function updateSize() {
-                                const html = iframe.contentWindow.document.documentElement;
+                                const html = iframe.contentDocument.documentElement;
                                 const height = html.getBoundingClientRect().height + 35;
                                 iframe.style.height = height + 'px';
                               }
@@ -92,17 +91,19 @@ public partial class EpubControl
                             }
 
                             function scrollToAnchor(iframeId, anchorId) {
+                              if (!iframeId) return;
                               const iframe = document.getElementById(iframeId);
-                              const doc = iframe.contentWindow.document;
-                              const target = doc.getElementById(anchorId) || doc.querySelector(`[name='${anchorId}']`);
-                              if (target) {
-                                target.scrollIntoView({ behavior: 'smooth' });
-                              }
+                              if (!iframe) return;
+                              if (anchorId) {
+                                const doc = iframe.contentDocument;
+                                const target = doc.getElementById(anchorId) || doc.querySelector(`[name='${anchorId}']`);
+                                if (target) target.scrollIntoView({ behavior: 'smooth' });
+                              } else iframe.scrollIntoView({ behavior: 'smooth' });
                             }
 
                             function injectScrollScript(iframe) {
                               try {
-                                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                const doc = iframe.contentDocument;
                                 const script = doc.createElement('script');
                                 script.textContent = `
                                   (function () {
@@ -115,12 +116,9 @@ public partial class EpubControl
                                         e.preventDefault();
                                         if (targetPath.includes('#')) {
                                           let [key, a] = targetPath.split('#');
-                                          if (window.parent && window.parent.scrollToAnchor) {
+                                          if (window.parent && window.parent.scrollToAnchor)
                                             window.parent.scrollToAnchor(key, a);
-                                          }
-                                        } else {
-                                          window.parent.document.getElementById(targetPath).scrollIntoView({ behavior: 'smooth' });
-                                        }
+                                        } else window.parent.document.getElementById(targetPath).scrollIntoView({ behavior: 'smooth' });
                                       });
                                     });
                                   })();
@@ -130,15 +128,6 @@ public partial class EpubControl
                                 console.warn('Failed to inject script into iframe (likely cross-origin):', e);
                               }
                             }
-
-                            window.addEventListener('load', () => {
-                              const iframes = document.querySelectorAll('iframe');
-                              iframes.forEach((iframe) => {
-                                iframe.addEventListener('load', () => injectScrollScript(iframe));
-                                // Inject again in case it's already loaded
-                                injectScrollScript(iframe);
-                              });
-                            });
                         </script>
                         <style>
                             body { margin: 0; }
@@ -150,7 +139,7 @@ public partial class EpubControl
                         </style>
                     </head>
                 <body>
-                    {{Book.ReadingOrder.Aggregate("", (a, b) => a + $"<iframe src=\"{Constants.VirtualHostFull}{b.Key}\" id=\"{b.Key}\" onLoad=\"resizer('{b.Key}');\"></iframe>")}}
+                    {{Book.ReadingOrder.Aggregate("", (a, b) => a + $"<iframe src=\"{Constants.VirtualHostFull}{b.Key}\" id=\"{b.Key}\" onload="resizeIframe(this);injectScrollScript(this);"></iframe>")}}
                 </body>
             </html>
             """;
@@ -194,11 +183,9 @@ public partial class EpubControl
 
         WebView.CoreWebView2.SourceChanged += (_, _) =>
         {
-            Console.WriteLine($"Changed To: {CurrentPage}");
             var index = Book.ReadingOrder.FindIndex(a => a.Key == CurrentPage.Split('#').First()) + 1;
             if (index == 0) return;
             Slider.Value = index;
-            Console.WriteLine($"To Index: {index}/{Book.ReadingOrder.Count}");
         };
 
         // File.WriteAllText("book.json", JsonHelper.Serialize(Book, true));
@@ -233,7 +220,7 @@ public partial class EpubControl
         if (!string.IsNullOrWhiteSpace(a))
             await WebView.ExecuteScriptAsync($"scrollToAnchor('{key}','{a}');");
         else
-            await WebView.ExecuteScriptAsync($"document.getElementById('{key}').scrollIntoView({{ behavior: 'smooth' }});");
+            await WebView.ExecuteScriptAsync($"scrollToAnchor('{key}');");
     }
 
     public async Task WaitForPageLoadAsync()
