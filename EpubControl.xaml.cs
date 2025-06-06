@@ -109,14 +109,8 @@ public partial class EpubControl
                                   (function () {
                                     document.querySelectorAll('a[href]').forEach((link) => {
                                       link.addEventListener('click', function (e) {
-                                        const target = this.href;
                                         e.preventDefault();
-
-                                        if (target.includes('{{Constants.VirtualHostFull}}')) {
-                                          const targetPath = target.replace('{{Constants.VirtualHostFull}}','');
-                                          const [key, a] = targetPath.split('#');
-                                          window.parent.scrollToAnchor(key, a);
-                                        } else window.parent.chrome.webview.postMessage("{{Constants.ExternalLinkMessageHead}}" + target);
+                                        window.parent.chrome.webview.postMessage("{{Constants.LinkMessageHead}}" + this.href);
                                       });
                                     });
                                   })();
@@ -207,11 +201,22 @@ public partial class EpubControl
                 if (index == -1) return;
                 Slider.Value = index;
             }
-            else if (message.StartsWith(Constants.ExternalLinkMessageHead)) { Process.Start(new ProcessStartInfo { FileName = message[Constants.ExternalLinkMessageHead.Length..], UseShellExecute = true }); }
             else if (message.StartsWith(Constants.LinkMessageHead))
             {
-                var ka = message[Constants.LinkMessageHead.Length..].split('#');
-                NavigateAsync(ka[0], ka[1]); 
+                var link = message[Constants.LinkMessageHead.Length..];
+                if (!link.StartsWith(Constants.VirtualHostFull)) Process.Start(new ProcessStartInfo { FileName = link, UseShellExecute = true });
+                else
+                {
+                    var relPath = link.Replace(Constants.VirtualHostFull,"");
+                    string key = ""; string anchor = "";
+                    if (relPath.Contains("#"))
+                    { 
+                        var ka = relPath.Split('#');
+                        key = ka[0]; anchor = ka[1];
+                    }
+                    else key = relPath;
+                    NavigateAsync(key, anchor); 
+                }
             }
         };
 
