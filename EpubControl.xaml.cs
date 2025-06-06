@@ -91,7 +91,10 @@ public partial class EpubControl
                             function scrollToAnchor(iframeId, anchorId) {
                               if (!iframeId) return;
                               const iframe = document.getElementById(iframeId);
-                              if (!iframe) return;
+                              if (!iframe) {
+                                  window.parent.chrome.webview.postMessage("{{Constants.LinkMessageHead}}" + iframeId + '#' + anchorId);
+                                  return;
+                              }
                               if (anchorId) {
                                 const doc = iframe.contentDocument;
                                 const target = doc.getElementById(anchorId) || doc.querySelector(`[name='${anchorId}']`);
@@ -205,6 +208,11 @@ public partial class EpubControl
                 Slider.Value = index;
             }
             else if (message.StartsWith(Constants.ExternalLinkMessageHead)) { Process.Start(new ProcessStartInfo { FileName = message[Constants.ExternalLinkMessageHead.Length..], UseShellExecute = true }); }
+            else if (message.StartsWith(Constants.LinkMessageHead))
+            {
+                var ka = message[Constants.LinkMessageHead.Length..].split('#');
+                NavigateAsync(ka[0], ka[1]); 
+            }
         };
 
         // File.WriteAllText("book.json", JsonHelper.Serialize(Book, true));
