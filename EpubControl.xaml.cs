@@ -36,8 +36,7 @@ public partial class EpubControl
             return;
         }
 
-
-        Directory.CreateDirectory(Constants.TempPath);
+        BookTempPath = $"{Constants.TempPath}{Convert.ToHexStringLower(SHA1.HashData(Encoding.UTF8.GetBytes(Book.Title)))[..6]}/";
 
         foreach (var lt in Book.Content.Html.Local) WriteTemp(lt);
         foreach (var lt in Book.Content.Css.Local) WriteTemp(lt);
@@ -52,8 +51,7 @@ public partial class EpubControl
 
         await WebView.EnsureCoreWebView2Async();
 
-        WebView.CoreWebView2.SetVirtualHostNameToFolderMapping(Constants.VirtualHost,
-            Constants.TempPath, CoreWebView2HostResourceAccessKind.Allow);
+        WebView.CoreWebView2.SetVirtualHostNameToFolderMapping(Constants.VirtualHost, BookTempPath, CoreWebView2HostResourceAccessKind.Allow);
 
         if (File.Exists(Constants.CssPath))
             await WebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync($$"""
@@ -74,6 +72,7 @@ public partial class EpubControl
             <!DOCTYPE html>
                 <html>
                     <head>
+                        <meta charset="UTF-8" />
                         <script>
                             function resizeIframe(iframe) {
                               if (!iframe) return;
@@ -91,10 +90,7 @@ public partial class EpubControl
                             function scrollToAnchor(iframeId, anchorId) {
                               if (!iframeId) return;
                               const iframe = document.getElementById(iframeId);
-                              if (!iframe) {
-                                  window.parent.chrome.webview.postMessage("{{Constants.LinkMessageHead}}" + iframeId + '#' + anchorId);
-                                  return;
-                              }
+                              if (!iframe) return;
                               if (anchorId) {
                                 const doc = iframe.contentDocument;
                                 const target = doc.getElementById(anchorId) || doc.querySelector(`[name='${anchorId}']`);
@@ -102,7 +98,7 @@ public partial class EpubControl
                               } else iframe.scrollIntoView({ behavior: 'smooth' });
                             }
 
-                            function injectScrollScript(iframe) {
+                            function injectLinkScript(iframe) {
                                 const doc = iframe.contentDocument;
                                 const script = doc.createElement('script');
                                 script.textContent = `
@@ -118,16 +114,12 @@ public partial class EpubControl
                                 doc.head.appendChild(script);
                             }
                             
-                            function notifyHostScrolledTo(iframeId) {
-                              window.chrome.webview.postMessage("{{Constants.ScrollMessageHead}}" + iframeId);
-                            }
-
                             window.addEventListener('scroll', () => {
                               for(const iframe of document.querySelectorAll('iframe')){
                                 const rect = iframe.getBoundingClientRect();
                                 const visibleRatio = rect.height > 0 ? (Math.min(window.innerHeight, rect.bottom) - Math.max(0, rect.top)) / window.innerHeight : 0;
                                 if (visibleRatio > 0.6) {
-                                  notifyHostScrolledTo(iframe.id);
+                                  window.chrome.webview.postMessage("{{Constants.ScrollMessageHead}}" + iframe.id);
                                   break;
                                 }
                               }
@@ -143,13 +135,13 @@ public partial class EpubControl
                         </style>
                     </head>
                 <body>
-                    {{Book.ReadingOrder.Aggregate("", (a, b) => a + $"<iframe src=\"{Constants.VirtualHostFull}{b.Key}\" id=\"{b.Key}\" onload=\"resizeIframe(this);injectScrollScript(this);\"></iframe>")}}
+                    {{Book.ReadingOrder.Aggregate("", (a, b) => a + $"<iframe src=\"{Constants.VirtualHostFull}{b.Key}\" id=\"{b.Key}\" onload=\"resizeIframe(this);injectLinkScript(this);\"></iframe>")}}
                 </body>
             </html>
             """;
 
-        File.WriteAllText($"{Constants.TempPath}{Constants.MainPageName}", unifiedHtml);
-
+        Directory.CreateDirectory(BookTempPath);
+        File.WriteAllText($"{BookTempPath}{Constants.MainPageName}", unifiedHtml);
         WebView.CoreWebView2.Navigate($"{Constants.VirtualHostFull}{Constants.MainPageName}");
 
         CurrentSec = Book.ReadingOrder[0].Key;
@@ -207,17 +199,18 @@ public partial class EpubControl
                 if (!link.StartsWith(Constants.VirtualHostFull)) Process.Start(new ProcessStartInfo { FileName = link, UseShellExecute = true });
                 else
                 {
-                    var relPath = link.Replace(Constants.VirtualHostFull,"");
+                    var relPath = link.Replace(Constants.VirtualHostFull, "");
                     string key = ""; string anchor = "";
-                    if (relPath.Contains("#"))
-                    { 
+                    if (relPath.Contains('#'))
+                    {
                         var ka = relPath.Split('#');
                         key = ka[0]; anchor = ka[1];
                     }
                     else key = relPath;
-                    NavigateAsync(key, anchor); 
+                    _ = NavigateAsync(key, anchor);
                 }
             }
+            else Trace.WriteLine($"UnknownMessage: {message}");
         };
 
         // File.WriteAllText("book.json", JsonHelper.Serialize(Book, true));
@@ -226,14 +219,14 @@ public partial class EpubControl
     public string CurrentPage => WebView.CoreWebView2.Source.Replace(Constants.VirtualHostFull, "");
     public string CurrentSec { get; set; } = "";
     public int CurrentIndex => Book?.ReadingOrder.FindIndex(a => a.Key == CurrentSec) ?? -1;
+    public string BookTempPath { get; set; } = $"{Constants.TempPath}{DateTime.Now.Ticks.ToString()[^4..]}/";
 
     public async Task NavigateAsync(string? key, string? a = null)
     {
         if (Book == null || string.IsNullOrWhiteSpace(key)) return;
 
-        Console.WriteLine($"To Path: {key} | {(a != null ? "#" : "")}{a}");
-        Console.WriteLine(File.Exists($"{Constants.TempPath}{key}"));
-        if (!File.Exists($"{Constants.TempPath}{key}"))
+        Trace.WriteLine($"To Path: {key} | {(a != null ? "#" : "")}{a}");
+        if (!File.Exists($"{BookTempPath}{key}"))
             key = key.Split('.').Last() + "/" + key;
 
         if (!Book.ReadingOrder.Any(a => a.Key == key))
@@ -274,19 +267,19 @@ public partial class EpubControl
     }
 
 
-    private static void WriteTemp(EpubLocalTextContentFile? file)
+    private void WriteTemp(EpubLocalTextContentFile? file)
     {
         if (file is null) return;
-        var path = $"{Constants.TempPath}{file.Key}";
+        var path = $"{BookTempPath}{file.Key}";
         var dir = Path.GetDirectoryName(path) ?? "";
         Directory.CreateDirectory(dir);
         File.WriteAllText(path, file.Content);
     }
 
-    private static void WriteTemp(EpubLocalByteContentFile? file)
+    private void WriteTemp(EpubLocalByteContentFile? file)
     {
         if (file is null) return;
-        var path = $"{Constants.TempPath}{file.Key}";
+        var path = $"{BookTempPath}{file.Key}";
         var dir = Path.GetDirectoryName(path) ?? "";
         Directory.CreateDirectory(dir);
         File.WriteAllBytes(path, file.Content);
@@ -329,7 +322,7 @@ public partial class EpubControl
             {
                 Console.WriteLine($"Deobfuscating: {fontUri}");
                 if (string.IsNullOrWhiteSpace(fontUri)) return;
-                var fontPath = Constants.TempPath + Path.GetRelativePath(rootPath, fontUri);
+                var fontPath = BookTempPath + Path.GetRelativePath(rootPath, fontUri);
                 Console.WriteLine($"Temp Path: {fontPath}");
 
                 var tempPath = fontPath + ".tmp";

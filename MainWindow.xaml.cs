@@ -40,11 +40,11 @@ public partial class MainWindow
         };
     }
 
-    private void ShowEpub(string path)
+    public void ShowEpub(string path)
     {
         var view = new EpubControl(path);
         CurrentEpubView = view;
-        this.Content = view;
+        Content = view;
     }
 
     public EpubControl CurrentEpubView { get; private set; }
