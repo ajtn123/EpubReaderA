@@ -6,7 +6,8 @@ public static class Constants
     public static string VirtualHostFull => $"https://{VirtualHost}/";
     public static string TempPath => "Temp/";
     public static string CssPath => "styles.css";
-    public static string ScrollMessageHead => "scrolled:";
-    public static string ExternalLinkMessageHead => "externalLink:";
+    public static string MessageIdentifier => "EpubReader-";
+    public static string ScrollMessageHead => $"{MessageIdentifier}Scrolled:";
+    public static string LinkMessageHead => $"{MessageIdentifier}Link:";
     public static string MainPageName => "EpubReaderUnifiedHtml.html";
 }
