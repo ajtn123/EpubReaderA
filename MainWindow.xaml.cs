@@ -18,7 +18,7 @@ public partial class MainWindow
 
         var args = Environment.GetCommandLineArgs();
         if (args.Length != 0)
-            ShowEpub(args[0]);
+            ShowEpub(args.First(x => x.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)));
 
         CurrentEpubView ??= new EpubControl();
 
