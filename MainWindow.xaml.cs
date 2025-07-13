@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 
 namespace EpubReaderA;
 
@@ -10,6 +11,10 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
+
+        var dir = new FileInfo(Environment.ProcessPath ?? string.Empty).DirectoryName ?? null;
+        if (string.IsNullOrWhiteSpace(dir)) Close();
+        else Environment.CurrentDirectory = dir;
 
         var args = Environment.GetCommandLineArgs();
         if (args.Length != 0)
