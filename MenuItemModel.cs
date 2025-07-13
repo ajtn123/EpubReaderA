@@ -33,7 +33,6 @@ public class NavigateCommand : ICommand
     public required string? Anchor { get; init; }
 
     public void Execute(object? parameter) =>
-        // ReSharper disable once AccessToStaticMemberViaDerivedType
         (Window.GetWindow(App.Current.MainWindow!) as MainWindow)?.CurrentEpubView.NavigateAsync(Key, Anchor);
 
     public bool CanExecute(object? parameter) => Key != null;
