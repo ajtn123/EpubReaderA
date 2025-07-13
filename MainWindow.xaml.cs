@@ -11,7 +11,9 @@ public partial class MainWindow
     {
         InitializeComponent();
 
-        ShowEpub("C:/Users/chenf/Downloads/epub30-spec.epub");
+        var args = Environment.GetCommandLineArgs();
+        if (args.Length != 0)
+            ShowEpub(args[0]);
 
         CurrentEpubView ??= new EpubControl();
 
