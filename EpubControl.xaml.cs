@@ -36,7 +36,9 @@ public partial class EpubControl
             return;
         }
 
-        BookTempPath = $"{Constants.TempPath}{Convert.ToHexStringLower(SHA1.HashData(Encoding.UTF8.GetBytes(Book.Title)))[..6]}/";
+        string title = string.IsNullOrWhiteSpace(Book.Title) ? "Untitled" : Book.Title;
+        BookTempPath = $"{Constants.TempPath}{Convert.ToHexStringLower(SHA1.HashData(Encoding.UTF8.GetBytes(title)))[..6]}/";
+        Application.Current.MainWindow.Title = title;
 
         foreach (var la in Book.Content.AllFiles.Local)
             if (la is EpubLocalTextContentFile t) WriteTemp(t);
