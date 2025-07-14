@@ -3,9 +3,6 @@ using System.Windows;
 
 namespace EpubReaderA;
 
-/// <summary>
-///     Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow
 {
     public MainWindow()
@@ -58,5 +55,6 @@ public partial class MainWindow
         Content = view;
     }
 
-    public EpubControl CurrentEpubView { get; private set; }
+    private EpubControl? currentEpubView;
+    public EpubControl? CurrentEpubView { get => currentEpubView; private set { currentEpubView?.WebView.Dispose(); currentEpubView = value; } }
 }
