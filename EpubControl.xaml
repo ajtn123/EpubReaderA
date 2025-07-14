@@ -18,13 +18,13 @@
         </Grid.ColumnDefinitions>
 
 
-        <Grid x:Name="Expander" Grid.Row="0" Grid.Column="0" Grid.RowSpan="2">
+        <Grid x:Name="Expander" Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" MinWidth="50">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TreeView x:Name="Menu">
+            <TreeView x:Name="Menu" BorderThickness="0,0,1,0">
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate DataType="{x:Type local:MenuItemModel}"
                                               ItemsSource="{Binding Nested}">
@@ -32,8 +32,6 @@
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
-
-            <Button Grid.Row="1" x:Name="Structure" Content="BUTTON" />
         </Grid>
 
 
@@ -53,4 +51,11 @@
 
         <web:WebView2 x:Name="WebView" Grid.Column="1" Grid.Row="1" />
     </Grid>
+
+    <UserControl.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </UserControl.Resources>
 </UserControl>

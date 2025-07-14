@@ -4,6 +4,6 @@
              xmlns:local="clr-namespace:EpubReaderA"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-
+        <ResourceDictionary Source="/Slider.xaml"/>
     </Application.Resources>
 </Application>
