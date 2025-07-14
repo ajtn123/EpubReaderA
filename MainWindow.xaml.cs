@@ -12,13 +12,17 @@ public partial class MainWindow
     {
         InitializeComponent();
 
-        var dir = new FileInfo(Environment.ProcessPath ?? string.Empty).DirectoryName ?? null;
-        if (string.IsNullOrWhiteSpace(dir)) Close();
-        else Environment.CurrentDirectory = dir;
-
+        FileInfo? epubFile = null;
         var args = Environment.GetCommandLineArgs();
-        if (args.Length != 0)
-            ShowEpub(args.First(x => x.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)));
+        if (args.FirstOrDefault(x => { var f = new FileInfo(x!); return f.Exists && f.Extension.Equals(".epub", StringComparison.OrdinalIgnoreCase); }, null) is string epubFilePath)
+            epubFile = new FileInfo(epubFilePath);
+
+        if (Environment.ProcessPath is string processPath)
+            if (new FileInfo(processPath).DirectoryName is string dir)
+                Environment.CurrentDirectory = dir;
+            else Close();
+
+        if (epubFile != null) ShowEpub(epubFile.FullName);
 
         CurrentEpubView ??= new EpubControl();
 

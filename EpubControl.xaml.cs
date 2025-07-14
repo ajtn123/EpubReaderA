@@ -38,14 +38,9 @@ public partial class EpubControl
 
         BookTempPath = $"{Constants.TempPath}{Convert.ToHexStringLower(SHA1.HashData(Encoding.UTF8.GetBytes(Book.Title)))[..6]}/";
 
-        foreach (var lt in Book.Content.Html.Local) WriteTemp(lt);
-        foreach (var lt in Book.Content.Css.Local) WriteTemp(lt);
-        foreach (var lb in Book.Content.Images.Local) WriteTemp(lb);
-        foreach (var lb in Book.Content.Fonts.Local) WriteTemp(lb);
-        foreach (var lb in Book.Content.Audio.Local) WriteTemp(lb);
-
-        WriteTemp(Book.Content.Cover);
-        WriteTemp(Book.Content.NavigationHtmlFile);
+        foreach (var la in Book.Content.AllFiles.Local)
+            if (la is EpubLocalTextContentFile t) WriteTemp(t);
+            else if (la is EpubLocalByteContentFile b) WriteTemp(b);
 
         Deobfuscate();
 
@@ -79,7 +74,7 @@ public partial class EpubControl
 
                               function updateSize() {
                                 const html = iframe.contentDocument.documentElement;
-                                const height = html.getBoundingClientRect().height + 35;
+                                const height = html.getBoundingClientRect().height + 50;
                                 iframe.style.height = height + 'px';
                               }
 
